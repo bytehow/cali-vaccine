@@ -1,9 +1,11 @@
 import time
 import traceback
+import argparse
 from datetime import date, datetime, timedelta
 from pprint import pprint
 
 import requests
+from tweet import TwitterHandler
 from colorama import Fore, Back, Style
 
 GEOCODES = {
@@ -193,8 +195,23 @@ def get_tweet(location_group, total, start, end):
     else:
         return None
 
-
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--no-tweet', 
+        help='Dont send out tweets',
+        action='store_true',
+        required=False,
+    )
+
+    parser.add_argument('--no-error', 
+        help='Dont send error message DMs',
+        action='store_true',
+        required=False,
+    )
+
+    args = parser.parse_args()
+
+    twitter_handler = TwitterHandler()
 
     while(True):
         for group in GEOCODES.keys():
@@ -216,12 +233,17 @@ def main():
                 tweet = get_tweet(group, total, start, end)
                 if tweet:
                     print(Fore.LIGHTMAGENTA_EX + tweet.replace('\n', '\n' + Fore.LIGHTMAGENTA_EX ) + Style.RESET_ALL)
+                    if not args.no_tweet:
+                        twitter_handler.tweet(tweet)
                 else:
                     print('<last tweet is still accurate. not tweeting>')
                 print('-'* 10)
             except Exception:
-                print(Fore.RED + traceback.format_exc() + Style.RESET_ALL)
+                error_str = traceback.format_exc()
+                if not args.no_error:
+                    twitter_handler.dm(error_str)
 
+                print(Fore.RED + error_str + Style.RESET_ALL)
 
         sleep = 60
         print(f'Sleeping {sleep} seconds...')

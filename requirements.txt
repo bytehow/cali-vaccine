@@ -2,3 +2,4 @@ numpy
 sympy
 requests
 colorama
+python-twitter
