@@ -22,6 +22,17 @@ GEOCODES = {
         (34.425331,-118.597219), # Sixflags
         (33.976124,-117.905339), # Rowland heights
         (33.980601,-117.375494), # Riverside
+    ],
+    'Sacremento': [
+        (38.581572,-121.4944), # Sacremento
+        (38.677959,-121.176058), # Folsom
+    ],
+    'San Diego': [
+        (32.715738,-117.161084), # San Diego
+    ],
+    'Marin': [
+        (38.083403,-122.763304), # Marin County
+        (37.973535,-122.531087), # San Rafael
     ]
 }
 
