@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta
 from pprint import pprint
 
 import requests
+import pytz
 from tweet import TwitterHandler
 from colorama import Fore, Back, Style
 
@@ -30,9 +31,13 @@ GEOCODES = {
     'San Diego': [
         (32.715738,-117.161084), # San Diego
     ],
-    'Marin': [
-        (38.083403,-122.763304), # Marin County
-        (37.973535,-122.531087), # San Rafael
+    # 'Marin': [
+    #     (38.083403,-122.763304), # Marin County
+    #     (37.973535,-122.531087), # San Rafael
+    # ]
+    'Ventura/Oxnard': [
+        (34.280492,-119.29452), # Ventura County
+        (34.197505,-119.177052), # Oxnard
     ]
 }
 
@@ -168,6 +173,11 @@ def print_appointments(location_group, locations, appts, total, start, end, prin
 
     print(Style.RESET_ALL)
 
+def get_timestamp():
+    tz = pytz.timezone('US/Pacific')
+    t = datetime.now(tz).strftime("%I:%M %p")
+    return f'({t})'
+
 def get_tweet(location_group, total, start, end):
     prev = STATE[location_group]['current'] 
     prev_max = STATE[location_group]['max'] 
@@ -190,21 +200,30 @@ def get_tweet(location_group, total, start, end):
     # Never had appointments
     if (prev <= 0 and total > 0) or (total > 0 and (prev_start != start or prev_end != end)) :
         if start == end:
-            return f'{location_group} has {total} appointments on {start} 🙌\nBook one now at myturn.ca.gov!'
+            tweet = f'{location_group} has {total} appointments on {start} 🙌\nBook one now at myturn.ca.gov!'
         else:
-            return f'{location_group} has {total} appointments between {start} - {end} 🙌\nBook one now at myturn.ca.gov!'
+            tweet = f'{location_group} has {total} appointments between {start} - {end} 🙌\nBook one now at myturn.ca.gov!'
     # Was >0 appointments, but now no appointments
     elif (prev > 0 and total == 0) or prev == -1:
-        return f'{location_group} has no more available appointments 😔\nNo worries, I\'ll keep checking for you 🤖'
+        tweet = f'{location_group} has no more available appointments 😔\nNo worries, I\'ll keep checking for you 🤖'
     # Number of appointments greater than max
     elif total > prev_max and prev_max > 0:
         diff = total - prev_max
         if start == end:
-            return f'{location_group} added {diff} appointments 🤩\nThere are now {total} appointments on {start}\nBook one at myturn.ca.gov!'
+            tweet = f'{location_group} added {diff} appointments 🤩\nThere are now {total} appointments on {start}\nBook one at myturn.ca.gov!'
         else:
-            return f'{location_group} added {diff} appointments 🤩\nThere are now {total} appointments between {start} - {end}\nBook one at myturn.ca.gov!'
+            tweet = f'{location_group} added {diff} appointments 🤩\nThere are now {total} appointments between {start} - {end}\nBook one at myturn.ca.gov!'
+    else:
+        tweet = None
+
+    # Add a seasrchable hashtag
+    if tweet:
+        location_tag = f'#{location_group.replace(" ", "")}Appts'
+        timestamp = get_timestamp()
+        return f'{timestamp} {tweet} {location_tag}'
     else:
         return None
+
 
 def main():
     parser = argparse.ArgumentParser()
