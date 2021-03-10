@@ -6,6 +6,7 @@ import configparser
 import twitter
 
 TWITTER_DM_LIMIT = 10000
+TWITTER_TWEET_LIMIT = 280
 
 def chunks(lst, n):
     """Yield successive n-sized chunks from lst."""
@@ -60,8 +61,14 @@ class TwitterHandler():
         self._api = twitter.Api(consumer_key=consumer_key, consumer_secret=consumer_secret,
                           access_token_key=access_key, access_token_secret=access_secret)
 
-    def tweet(self, message):
-        return self._api.PostUpdate(message)
+    def tweet(self, message, reply_to=None):
+        if reply_to:
+            return self._api.PostUpdate(message,
+                in_reply_to_status_id=reply_to,
+                auto_populate_reply_metadata=True
+            )
+        else:
+            return self._api.PostUpdate(message)
 
     def dm(self, message, to=None):
         if not to:
@@ -74,3 +81,9 @@ class TwitterHandler():
              responses.append(self._api.PostDirectMessage(chunk, user_id=recipient['id'], return_json=True) )
 
         return responses
+    
+    def tweet_thread(self, messages):
+        prev = self.tweet(messages[0])
+        for message in messages[1:]:
+            prev = self.tweet(message, reply_to=prev.id)
+        
