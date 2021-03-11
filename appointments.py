@@ -24,17 +24,31 @@ GEOCODES = {
         (33.976124,-117.905339), # Rowland heights
         (33.980601,-117.375494), # Riverside
     ],
-    'Sacramento': [
-        (38.581572,-121.4944), # Sacremento
-        (38.677959,-121.176058), # Folsom
-    ],
+    # 'Sacramento': [
+    #     (38.581572,-121.4944), # Sacremento
+    #     (38.677959,-121.176058), # Folsom
+    # ],
     'San Diego': [
-        (32.715738,-117.161084), # San Diego
+        (32.700958,-117.126016), # Central Region Immunization Clinic
+        (32.672315,-117.10377), # Martin Luther King Community Center- Janssen
+        (32.710125,-117.084695), # Tubman-Chavez Community Center
+        (32.755407,-117.101196), # Copley-Price YMCA
+        (32.740031,-117.029802), # Lemon Grove Community Center
+        (32.606372,-117.085752), # South Region Live Well Center at Chula Vista
+        (32.576672,-117.121752), # Mar Vista High School
+        (32.57815,-117.05707), # Border View YMCA - Janssen
+        (32.555746,-117.05417), # San Ysidro Southwestern College
+        (32.798785,-116.960557), # East Public Health Center
+        (32.973742,-117.260998), # North Coastal – Scripps Del Mar Fairgrounds Park Super Station
+        (33.12486,-117.075823), # Palomar Medical Center Downtown Escondido
+        (33.131983,-117.157541), # San Marcos Vaccine Super Station at Cal State University San Marcos (CSUSM), Sports Center
+        (33.2081,-117.245749), # Linda Rhoades Recreation Center
+        (33.211189,-117.311218), # North Coastal Live Well Center
     ],
     # 'Marin': [
     #     (38.083403,-122.763304), # Marin County
     #     (37.973535,-122.531087), # San Rafael
-    # ]
+    # ],
     # 'Ventura/Oxnard': [
     #     (34.280492,-119.29452), # Ventura County
     #     (34.197505,-119.177052), # Oxnard
@@ -50,9 +64,27 @@ GEOCODES = {
 }
 
 STATE = {}
+PROXIES = {
+    'http': 'http://localhost:24000',
+    'https': 'http://localhost:24000',
+}
+
+PROXY_HOST='localhost'
 
 for key in GEOCODES.keys():
     STATE[key] = {'current': -1, 'max': -1, 'start': None, 'end': None}
+
+def make_proxied_request(method, url, always_proxy=False, **kwargs):
+    if always_proxy:
+        return requests.request(method, url, proxies=PROXIES,  **kwargs)
+
+    resp = requests.request(method, url, **kwargs)
+    # Try with proxy
+    if (resp.status_code == 403):
+        print('Got 403. Using proxy')
+        resp = requests.request(method, url, proxies=PROXIES, **kwargs)
+
+    return resp
 
 def get_locations(location_group):
     locations = {}
@@ -65,24 +97,24 @@ def get_locations(location_group):
         today = str(date.today())
         payload={"doseNumber": 1, "fromDate": today, "location": {"lat": lat, "lng": lng}, "locationQuery": {"includePools": ["default"]}, "url": "https://myturn.ca.gov/location-select", "vaccineData": "WyJhM3F0MDAwMDAwMDFBZExBQVUiLCJhM3F0MDAwMDAwMDFBZE1BQVUiLCJhM3F0MDAwMDAwMDFBZ1VBQVUiLCJhM3F0MDAwMDAwMDFBZ1ZBQVUiXQ=="}
 
-        res =  requests.post(url, headers=headers, json=payload)
+        res = make_proxied_request('POST', url, headers=headers, json=payload)
         res.raise_for_status()
-
         res_json = res.json()
 
         if not res_json['locations']:
             continue
-    
+
         for loc in res_json['locations']:
             if loc['type'] != 'OnlineBooking':
                 continue
 
             id = loc['extId']
             name = loc['name']
+            address = loc['displayAddress']
             if id in locations:
                 continue
 
-            locations[id] = { 'id': id, 'name': name }
+            locations[id] = { 'id': id, 'name': name, 'address': address }
 
     return locations
 
@@ -92,7 +124,7 @@ def get_appt_days(id, start, end, dose=1):
     burp0_url = f"https://api.myturn.ca.gov:443/public/locations/{id}/availability"
     burp0_headers = {"Connection": "close", "sec-ch-ua": "\";Not A Brand\";v=\"99\", \"Chromium\";v=\"88\"", "Accept": "application/json, text/plain, */*", "X-Correlation-Id": "3c3d1dda-7006-4d18-81e7-f7595ef1a55d", "sec-ch-ua-mobile": "?0", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36", "Content-Type": "application/json;charset=UTF-8", "Origin": "https://myturn.ca.gov", "Sec-Fetch-Site": "same-site", "Sec-Fetch-Mode": "cors", "Sec-Fetch-Dest": "empty", "Referer": "https://myturn.ca.gov/", "Accept-Encoding": "gzip, deflate", "Accept-Language": "en-US,en;q=0.9"}
     burp0_json={"doseNumber": dose, "endDate": str(end), "startDate": str(start), "url": "https://myturn.ca.gov/appointment-select", "vaccineData": "WyJhM3F0MDAwMDAwMDFBZExBQVUiXQ=="}
-    resp = requests.post(burp0_url, headers=burp0_headers, json=burp0_json)
+    resp = make_proxied_request('POST', burp0_url, headers=burp0_headers, json=burp0_json)
     resp.raise_for_status()
     resp_json = resp.json()
 
@@ -103,7 +135,7 @@ def get_slots(id, day):
     burp0_url = f"https://api.myturn.ca.gov:443/public/locations/{id}/date/{day}/slots"
     burp0_headers = {"Connection": "close", "sec-ch-ua": "\";Not A Brand\";v=\"99\", \"Chromium\";v=\"88\"", "Accept": "application/json, text/plain, */*", "X-Correlation-Id": "3c3d1dda-7006-4d18-81e7-f7595ef1a55d", "sec-ch-ua-mobile": "?0", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36", "Content-Type": "application/json;charset=UTF-8", "Origin": "https://myturn.ca.gov", "Sec-Fetch-Site": "same-site", "Sec-Fetch-Mode": "cors", "Sec-Fetch-Dest": "empty", "Referer": "https://myturn.ca.gov/", "Accept-Encoding": "gzip, deflate", "Accept-Language": "en-US,en;q=0.9"}
     burp0_json={"url": "https://myturn.ca.gov/appointment-select", "vaccineData": "WyJhM3F0MDAwMDAwMDFBZExBQVUiXQ=="}
-    resp = requests.post(burp0_url, headers=burp0_headers, json=burp0_json)
+    resp = make_proxied_request('POST', burp0_url, headers=burp0_headers, json=burp0_json)
     resp.raise_for_status()
     resp_json = resp.json()
 
@@ -267,6 +299,7 @@ def get_location_tweets(locations, appointments):
     for id, appts in appointments.items():
         total = 0
         name = locations[id]['name']
+        address = locations[id]['address']
 
         # Figure out earliest and latest day for this location
         start = None
@@ -293,17 +326,21 @@ def get_location_tweets(locations, appointments):
         end = end.strftime('%m-%d-%Y')
 
         timestamp = get_timestamp()
+        tweet = ''
         if start == end:
             if (total > 1):
-                tweets.append(f'{timestamp} {total} of them on {start} when selecting 👇\n\n"{name}"')
+                tweet += f'{timestamp} {total} of them on {start}'
             else:
-                tweets.append(f'{timestamp} {total} on {start} when selecting 👇\n\n"{name}"')
+                tweet += f'{timestamp} {total} on {start}'
         else:
             if (total > 1):
-                tweets.append(f'{timestamp} {total} of them between {start} - {end} when selecting 👇\n\n"{name}"')
+                tweet += f'{timestamp} {total} of them between {start} - {end}'
             else:
                 # Should never happen
-                tweets.append(f'{timestamp} {total} on {start} or {end} when selecting 👇\n\n"{name}"')
+                tweet += f'{timestamp} {total} on {start} or {end}'
+
+        tweet += f' when selecting 👇\n\n"{name}"\n{address}\n\nYou MUST confirm your appointment first!'
+        tweets.append(tweet)
 
     return tweets
 
@@ -364,6 +401,6 @@ def main():
 
         sleep = 60
         print(f'Sleeping {sleep} seconds...')
-        time.sleep(60)
+        time.sleep(sleep)
 
 main()
