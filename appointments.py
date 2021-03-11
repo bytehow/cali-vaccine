@@ -12,17 +12,17 @@ from colorama import Fore, Back, Style
 GEOCODES = {
     # lat, lng
     'Bay Area': [
-        (37.77493,-122.419415), # San Francisco
-        (37.871523,-122.273042), # Berkley
-        (37.804351,-122.271164), # Oakland
-        (37.387474,-122.057543), # Silicon Valley
+        (37.752483,-122.19821), # Oakland Colisium
+        (37.784323,-122.40069), # Moscone Center
     ],
     'Los Angeles': [
-        (33.96168,-118.353131), # Inglewood
-        (34.238125,-118.530123), # Northridge
-        (34.425331,-118.597219), # Sixflags
-        (33.976124,-117.905339), # Rowland heights
-        (33.980601,-117.375494), # Riverside
+        (34.173598,-118.503011), # Balboa Sports Complex
+        (34.07504,-118.181976), # El Sereno Recreation Center
+        (34.085815,-117.76796), # SD 1 - Pomona Fairplex
+        (33.958085,-118.342062), # SD2-The Forum
+        (34.239936,-118.526252), # SD3-CSUN
+        (33.916392,-118.129275), # SD4-LA County Office of Education
+        (34.421362,-118.589395), # SD5-Six Flags Magic Mountain
     ],
     # 'Sacramento': [
     #     (38.581572,-121.4944), # Sacremento
