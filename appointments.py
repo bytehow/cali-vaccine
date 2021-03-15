@@ -131,6 +131,8 @@ def get_appt_days(id, start, end, dose=1):
     resp.raise_for_status()
     resp_json = resp.json()
 
+    time.sleep(.1)
+
     resp = make_proxied_request('POST', burp0_url, headers=burp0_headers, json=burp0_json)
     resp.raise_for_status()
     resp_json2 = resp.json()

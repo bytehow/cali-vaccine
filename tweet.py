@@ -7,6 +7,8 @@ import twitter
 
 TWITTER_DM_LIMIT = 10000
 TWITTER_TWEET_LIMIT = 280
+UNSUCCESSFUL_REPLY_ERROR = 385
+MAX_THREAD_RETRY = 5
 
 def chunks(lst, n):
     """Yield successive n-sized chunks from lst."""
@@ -14,9 +16,10 @@ def chunks(lst, n):
         yield lst[i:i + n]
 
 class TweetRc(object):
-    def __init__(self, config_path):
+    def __init__(self, config_path, config_section='Tweet'):
         self._config = None
         self.config_path = config_path
+        self.config_section = config_section
 
     def GetConsumerKey(self):
         return self._GetOption('consumer_key')
@@ -35,7 +38,7 @@ class TweetRc(object):
 
     def _GetOption(self, option):
         try:
-            return self._GetConfig().get('Tweet', option)
+            return self._GetConfig().get(self.config_section, option)
         except:
             return None
 
@@ -47,8 +50,8 @@ class TweetRc(object):
 
 
 class TwitterHandler():
-    def __init__(self, config_path=f'{os.path.dirname(os.path.realpath(__file__))}/.tweetrc'):
-        self.twitter_config = TweetRc(config_path)
+    def __init__(self, config_path=f'{os.path.dirname(os.path.realpath(__file__))}/.tweetrc', config_section='Tweet'):
+        self.twitter_config = TweetRc(config_path, config_section)
 
         consumer_key =  self.twitter_config.GetConsumerKey()
         consumer_secret = self.twitter_config.GetConsumerSecret()
@@ -85,5 +88,15 @@ class TwitterHandler():
     def tweet_thread(self, messages):
         prev = self.tweet(messages[0])
         for message in messages[1:]:
-            prev = self.tweet(message, reply_to=prev.id)
-        
+            count = 0
+            while count < MAX_THREAD_RETRY:
+                try:
+                    prev = self.tweet(message, reply_to=prev.id)
+                    break
+                except twitter.error.TwitterError as ex:
+                    if ex.message[0]['code'] == UNSUCCESSFUL_REPLY_ERROR:
+                        count += 1
+                        print(f'Unsuccessful reply of "{message}" to tweet {prev.id}. Attempts: {count}')
+                        continue
+                    else:
+                        raise(ex)
