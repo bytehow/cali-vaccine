@@ -16,7 +16,7 @@ def chunks(lst, n):
         yield lst[i:i + n]
 
 class TweetRc(object):
-    def __init__(self, config_path, config_section='Tweet'):
+    def __init__(self, config_section, config_path):
         self._config = None
         self.config_path = config_path
         self.config_section = config_section
@@ -50,8 +50,8 @@ class TweetRc(object):
 
 
 class TwitterHandler():
-    def __init__(self, config_path=f'{os.path.dirname(os.path.realpath(__file__))}/.tweetrc', config_section='Tweet'):
-        self.twitter_config = TweetRc(config_path, config_section)
+    def __init__(self, config_section, config_path=f'{os.path.dirname(os.path.realpath(__file__))}/.tweetrc'):
+        self.twitter_config = TweetRc(config_section, config_path)
 
         consumer_key =  self.twitter_config.GetConsumerKey()
         consumer_secret = self.twitter_config.GetConsumerSecret()
@@ -86,7 +86,8 @@ class TwitterHandler():
         return responses
     
     def tweet_thread(self, messages):
-        prev = self.tweet(messages[0])
+        thread = self.tweet(messages[0])
+        prev = thread
         for message in messages[1:]:
             count = 0
             while count < MAX_THREAD_RETRY:
@@ -100,3 +101,8 @@ class TwitterHandler():
                         continue
                     else:
                         raise(ex)
+
+        return thread
+
+    def retweet(self, status_id):
+        return self._api.PostRetweet(status_id)
