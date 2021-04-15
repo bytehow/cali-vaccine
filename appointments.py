@@ -18,6 +18,7 @@ GEOCODES = {
     BAY_AREA: [
         (37.752483,-122.19821), # Oakland Colisium
         (37.784323,-122.40069), # Moscone Center
+        (37.338208,-121.886329), # San Jose
     ],
     LOS_ANGELES: [
         (34.173598,-118.503011), # Balboa Sports Complex
