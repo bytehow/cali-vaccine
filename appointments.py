@@ -6,7 +6,7 @@ from pprint import pprint
 
 import requests
 import pytz
-from tweet import TwitterHandler
+from tweet import TwitterHandler, TWITTER_TWEET_LIMIT
 from colorama import Fore, Back, Style
 
 SAN_DIEGO = 'San Diego'
@@ -85,7 +85,12 @@ TWITTER_ACCOUNTS = {
     'PRIMARY': TwitterHandler('CovidVaccineCA'),
 }
 
-MIN_APPTS = 20
+DEFAULT_MIN_APPTS = 10
+MIN_APPTS = {
+    LOS_ANGELES: DEFAULT_MIN_APPTS,
+    BAY_AREA: 5,
+    SAN_DIEGO: DEFAULT_MIN_APPTS,
+}
 
 for key in GEOCODES.keys():
     STATE[key] = {'current': -1, 'max': -1, 'start': None, 'end': None}
@@ -268,7 +273,7 @@ def print_appointments(location_group, locations, appts, total, start, end, prin
     else:
         color = Fore.GREEN
 
-    print(f'{color} {location_group} has {total} available appointments between {start} - {end}{Style.RESET_ALL}')
+    print(f'{color} {location_group} has at least {total} available appointments between {start} - {end}{Style.RESET_ALL}')
 
     if total and print_slots:
         print('-----Listing slots:')
@@ -296,24 +301,21 @@ def get_summary_tweet(location_group, total, start, end):
     else:
         STATE[location_group]['max'] = max([prev_max, total])
 
-    if total < MIN_APPTS:
-        return None
-
     print('-----stats:')
     pprint(STATE[location_group])
 
     # Never had appointments
     if (prev <= 0 and total > 0) or (total > 0 and (prev_start != start or prev_end != end)) :
         if start == end:
-            tweet = f'{location_group} has {total} appointments on {start} 🙌\nBook one now at myturn.ca.gov!'
+            tweet = f'{location_group} has at least {total} appointments on {start} 🙌\nBook one now at myturn.ca.gov!'
         else:
-            tweet = f'{location_group} has {total} appointments between {start} - {end} 🙌\nBook one now at myturn.ca.gov!'
+            tweet = f'{location_group} has at least {total} appointments between {start} - {end} 🙌\nBook one now at myturn.ca.gov!'
     elif total > prev_max and prev_max > 0:
         diff = total - prev_max
         if start == end:
-            tweet = f'{location_group} added {diff} appointments 🤩\nThere are now {total} appointments on {start}\nBook one at myturn.ca.gov!'
+            tweet = f'{location_group} added {diff} appointments 🤩\nThere are now at least {total} appointments on {start}\nBook one at myturn.ca.gov!'
         else:
-            tweet = f'{location_group} added {diff} appointments 🤩\nThere are now {total} appointments between {start} - {end}\nBook one at myturn.ca.gov!'
+            tweet = f'{location_group} added {diff} appointments 🤩\nThere are now at least {total} appointments between {start} - {end}\nBook one at myturn.ca.gov!'
     else:
         tweet = None
 
@@ -325,7 +327,7 @@ def get_summary_tweet(location_group, total, start, end):
     else:
         return None
 
-def get_location_tweets(locations, appointments):
+def get_location_tweets(locations, appointments, min_appts):
     tweets = []
     for id, appts in appointments.items():
         total = 0
@@ -353,27 +355,39 @@ def get_location_tweets(locations, appointments):
         for slots in appts.values():
             total += len(slots)
 
-        if total < MIN_APPTS:
+        if total < min_appts:
             continue
 
         start = start.strftime('%m-%d-%Y')
         end = end.strftime('%m-%d-%Y')
 
         timestamp = get_timestamp()
-        tweet = ''
-        if start == end:
-            if (total > 1):
-                tweet += f'{timestamp} {total} of them on {start}'
-            else:
-                tweet += f'{timestamp} {total} on {start}'
-        else:
-            if (total > 1):
-                tweet += f'{timestamp} {total} of them between {start} - {end}'
-            else:
-                # Should never happen
-                tweet += f'{timestamp} {total} on {start} or {end}'
 
-        tweet += f' when selecting 👇\n\n"{name}"\n{address}\n\n🚨MyTurn is buggy! These may not be available!🚨'
+        to_trim = 1
+        while True:
+            tweet = ''
+            if start == end:
+                if (total > 1):
+                    tweet += f'{timestamp} {total} of them on {start}'
+                else:
+                    tweet += f'{timestamp} {total} on {start}'
+            else:
+                if (total > 1):
+                    tweet += f'{timestamp} {total} of them between {start} - {end}'
+                else:
+                    # Should never happen
+                    tweet += f'{timestamp} {total} on {start} or {end}'
+
+            tweet += f' when selecting 👇\n\n"{name}"\n{address}\n\n🚨MyTurn is buggy! These may not be available!🚨'
+
+            # Trim if we're over the lemit
+            if len(tweet) > TWITTER_TWEET_LIMIT:
+                name = locations[id]['name'][:-(to_trim + 3)]
+                name += '...'
+                to_trim += 1
+            else:
+                break
+
         tweets.append(tweet)
 
     return tweets
@@ -404,6 +418,11 @@ def main():
                 search_end = search_start + timedelta(days=8)
                 locations, appts, total, appt_start, appt_end = get_group_appointments(group, search_start, search_end)
 
+                min_appts = MIN_APPTS[group]
+                if total > 0 and total < min_appts:
+                    print(f'{group} has {total} appointments, which is less than min of {min_appts}. Skipping.')
+                    continue
+
                 if total:
                     start = appt_start.strftime('%m-%d-%Y')
                     end = appt_end.strftime('%m-%d-%Y')
@@ -414,10 +433,17 @@ def main():
                 print_appointments(group, locations, appts, total, start, end, print_slots=True)
                 print('Generating tweet:')
                 print('-'* 10)
+
                 tweet = get_summary_tweet(group, total, start, end)
+
                 if tweet:
-                    location_tweets = get_location_tweets(locations, appts)
+                    location_tweets = get_location_tweets(locations, appts, min_appts)
                     tweets = [tweet, *location_tweets]
+
+                    # Only tweet if there's locations that meet the minimum
+                    if len(tweets) == 1:
+                        continue
+
                     for t in tweets:
                         print(Fore.LIGHTMAGENTA_EX + t.replace('\n', '\n' + Fore.LIGHTMAGENTA_EX ) + Style.RESET_ALL)
                         print(f'Tweet was {len(t)} long')
