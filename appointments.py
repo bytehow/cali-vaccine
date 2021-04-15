@@ -324,7 +324,7 @@ def get_summary_tweet(location_group, total, start, end):
     if tweet:
         location_tag = f'#{location_group.replace(" ", "")}Appts'
         timestamp = get_timestamp()
-        return f'{timestamp} {tweet} #TeamVaccine {location_tag}\n\nLocation details below 🧵. NOTE: MyTurn is buggy and sometimes reports appointments that are not available!'
+        return f'{timestamp} {tweet} #TeamVaccine {location_tag}\n\nLocation details below 🧵'
     else:
         return None
 
